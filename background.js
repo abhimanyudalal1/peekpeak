@@ -1,11 +1,11 @@
 chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
     if (request.action === 'explainText') {
-        handleExplainRequest(request.text, request.context).then(sendResponse);
+        handleExplainRequest(request).then(sendResponse);
         return true; // Indicates asynchronous response
     }
 });
 
-async function handleExplainRequest(text, context) {
+async function handleExplainRequest(request) {
     try {
         const {
             apiKey,
@@ -28,7 +28,26 @@ async function handleExplainRequest(text, context) {
         else if (responseLength === 'medium') lengthInstruction = 'Keep the response concise, around 2-4 sentences.';
         else if (responseLength === 'detailed') lengthInstruction = 'Provide a detailed explanation.';
 
-        const finalPrompt = `SYSTEM:\n${systemPrompt}\n\nCONSTRAINT:\n${lengthInstruction}\n\nCONTEXT FROM PAGE:\n${context || 'No context available'}\n\nUSER:\nExplain the highlighted phrase in the context of the page.\n\nHighlighted text:\n${text}`;
+        let contents = [];
+        let returnedPrompt = null;
+
+        if (request.history && request.history.length > 0) {
+            contents = request.history.map(msg => ({
+                role: msg.role,
+                parts: [{ text: msg.text }]
+            }));
+            contents.push({
+                role: 'user',
+                parts: [{ text: request.text }]
+            });
+        } else {
+            const finalPrompt = `SYSTEM:\n${systemPrompt}\n\nCONSTRAINT:\n${lengthInstruction}\n\nCONTEXT FROM PAGE:\n${request.context || 'No context available'}\n\nUSER:\nExplain the highlighted phrase in the context of the page.\n\nHighlighted text:\n${request.text}`;
+            returnedPrompt = finalPrompt;
+            contents = [{
+                role: 'user',
+                parts: [{ text: finalPrompt }]
+            }];
+        }
 
         const url = `https://generativelanguage.googleapis.com/v1beta/models/${modelSelection}:generateContent?key=${apiKey}`;
 
@@ -37,11 +56,7 @@ async function handleExplainRequest(text, context) {
             headers: {
                 'Content-Type': 'application/json'
             },
-            body: JSON.stringify({
-                contents: [{
-                    parts: [{ text: finalPrompt }]
-                }]
-            })
+            body: JSON.stringify({ contents })
         });
 
         const data = await response.json();
@@ -51,7 +66,7 @@ async function handleExplainRequest(text, context) {
         }
 
         const aiText = data.candidates?.[0]?.content?.parts?.[0]?.text || 'No response generated.';
-        return { result: aiText };
+        return { result: aiText, firstPrompt: returnedPrompt };
 
     } catch (error) {
         return { error: error.message };

@@ -1,4 +1,5 @@
 let popupContainer = null;
+let conversationHistory = [];
 
 document.addEventListener('keydown', async (e) => {
     // Listen for Alt+A or Option+A
@@ -31,29 +32,42 @@ document.addEventListener('keydown', async (e) => {
                 contextText = fullText.substring(0, 500); // fallback
             }
 
-            showPopup(rect, text);
+            const { theme } = await chrome.storage.sync.get({ theme: 'light' });
+
+            conversationHistory = []; // Reset history for new popup
+            showPopup(rect, text, theme);
 
             // Send message to background script with context
-            chrome.runtime.sendMessage({ action: 'explainText', text: text, context: contextText }, (response) => {
-                if (chrome.runtime.lastError) {
-                    updatePopupContent('Error: Could not connect to background script. ' + chrome.runtime.lastError.message);
-                } else if (response && response.error) {
-                    updatePopupContent('Error: ' + response.error);
-                } else if (response && response.result) {
-                    updatePopupContent(response.result);
+            try {
+                chrome.runtime.sendMessage({ action: 'explainText', text: text, context: contextText }, (response) => {
+                    if (chrome.runtime.lastError) {
+                        setInitialContent('Error: Could not connect to background script. ' + chrome.runtime.lastError.message);
+                    } else if (response && response.error) {
+                        setInitialContent('Error: ' + response.error);
+                    } else if (response && response.result) {
+                        setInitialContent(response.result);
+                        conversationHistory.push({ role: 'user', text: response.firstPrompt || text });
+                        conversationHistory.push({ role: 'model', text: response.result });
+                    } else {
+                        setInitialContent('Unknown error occurred.');
+                    }
+                });
+            } catch (err) {
+                if (err.message.includes('Extension context invalidated')) {
+                    setInitialContent('<strong>Error:</strong> The extension was just updated. Please <strong>refresh this webpage</strong> to continue using AI Quick Explain.');
                 } else {
-                    updatePopupContent('Unknown error occurred.');
+                    setInitialContent('Error: ' + err.message);
                 }
-            });
+            }
         }
     }
 });
 
-function showPopup(rect, text) {
+function showPopup(rect, text, theme = 'light') {
     removePopup(); // Remove existing popup if any
 
     popupContainer = document.createElement('div');
-    popupContainer.className = 'ai-quick-explain-popup';
+    popupContainer.className = 'ai-quick-explain-popup' + (theme === 'dark' ? ' ai-quick-explain-dark' : '');
 
     // Calculate position: just below and slightly to the right of the selection
     let top = rect.bottom + window.scrollY + 10;
@@ -83,13 +97,17 @@ function showPopup(rect, text) {
     popupContainer.innerHTML = `
     <div class="ai-qe-header">
       <span class="ai-qe-title">✨ AI Quick Explain</span>
+      <button class="ai-qe-close-header" id="ai-qe-close">✕</button>
     </div>
     <div class="ai-qe-content" id="ai-qe-content">
-      <div class="ai-qe-loading">Thinking...</div>
+      <div class="ai-qe-loading" id="ai-qe-active-loading">Thinking...</div>
     </div>
     <div class="ai-qe-footer">
+      <div class="ai-qe-chat-container">
+        <input type="text" class="ai-qe-chat-input" id="ai-qe-chat-input" placeholder="Ask a follow-up..." />
+        <button class="ai-qe-chat-submit" id="ai-qe-chat-submit">➔</button>
+      </div>
       <button class="ai-qe-btn" id="ai-qe-copy">Copy</button>
-      <button class="ai-qe-btn" id="ai-qe-close">Close</button>
     </div>
   `;
 
@@ -103,18 +121,99 @@ function showPopup(rect, text) {
         copyBtn.innerText = 'Copied!';
         setTimeout(() => copyBtn.innerText = 'Copy', 2000);
     });
+
+    document.getElementById('ai-qe-chat-submit').addEventListener('click', handleFollowUp);
+    document.getElementById('ai-qe-chat-input').addEventListener('keypress', (e) => {
+        if (e.key === 'Enter') handleFollowUp();
+    });
 }
 
-function updatePopupContent(markdownText) {
+function handleFollowUp() {
+    const inputField = document.getElementById('ai-qe-chat-input');
+    const followUpText = inputField.value.trim();
+    if (!followUpText) return;
+
+    inputField.value = '';
+
+    appendUserMessage(followUpText);
+
+    const contentDiv = document.getElementById('ai-qe-content');
+    const loadingDiv = document.createElement('div');
+    loadingDiv.className = 'ai-qe-loading';
+    loadingDiv.innerText = 'Thinking...';
+    loadingDiv.id = 'ai-qe-active-loading';
+    contentDiv.appendChild(loadingDiv);
+    contentDiv.scrollTop = contentDiv.scrollHeight;
+
+    try {
+        chrome.runtime.sendMessage({ action: 'explainText', text: followUpText, history: conversationHistory }, (response) => {
+            document.getElementById('ai-qe-active-loading')?.remove();
+
+            if (chrome.runtime.lastError) {
+                appendModelMessage('Error: Could not connect to background script. ' + chrome.runtime.lastError.message);
+            } else if (response && response.error) {
+                appendModelMessage('Error: ' + response.error);
+            } else if (response && response.result) {
+                appendModelMessage(response.result);
+                conversationHistory.push({ role: 'user', text: followUpText });
+                conversationHistory.push({ role: 'model', text: response.result });
+            } else {
+                appendModelMessage('Unknown error occurred.');
+            }
+        });
+    } catch (err) {
+        document.getElementById('ai-qe-active-loading')?.remove();
+        if (err.message.includes('Extension context invalidated')) {
+            appendModelMessage('<strong>Error:</strong> The extension was just updated. Please <strong>refresh this webpage</strong>. ');
+        } else {
+            appendModelMessage('Error: ' + err.message);
+        }
+    }
+}
+
+function setInitialContent(markdownText) {
     if (!popupContainer) return;
     const contentDiv = document.getElementById('ai-qe-content');
     if (contentDiv) {
-        // Basic Markdown to HTML formatting (bold and paragraphs)
-        let formattedText = markdownText
-            .replace(/\\*\\*(.*?)\\*\\*/g, '<strong>$1</strong>')
-            .replace(/\\n\\n/g, '<br><br>');
-        contentDiv.innerHTML = formattedText;
+        contentDiv.innerHTML = `<div class="ai-qe-msg-model">${formatMarkdown(markdownText)}</div>`;
     }
+}
+
+function appendModelMessage(markdownText) {
+    if (!popupContainer) return;
+    const contentDiv = document.getElementById('ai-qe-content');
+    if (contentDiv) {
+        const div = document.createElement('div');
+        div.className = 'ai-qe-msg-model';
+        div.style.marginTop = '12px';
+        div.innerHTML = formatMarkdown(markdownText);
+        contentDiv.appendChild(div);
+        contentDiv.scrollTop = contentDiv.scrollHeight;
+    }
+}
+
+function appendUserMessage(text) {
+    if (!popupContainer) return;
+    const contentDiv = document.getElementById('ai-qe-content');
+    if (contentDiv) {
+        const div = document.createElement('div');
+        div.className = 'ai-qe-msg-user';
+        div.innerText = text;
+        contentDiv.appendChild(div);
+        contentDiv.scrollTop = contentDiv.scrollHeight;
+    }
+}
+
+function formatMarkdown(markdownText) {
+    return markdownText
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/```(?:[\w]*\n)?([\s\S]*?)```/g, '<pre><code>$1</code></pre>')
+        .replace(/`([^`]+)`/g, '<code>$1</code>')
+        .replace(/\*\*([\s\S]*?)\*\*/g, '<strong>$1</strong>')
+        .replace(/\*([^\*]+)\*/g, '<em>$1</em>')
+        .replace(/\n{2,}/g, '<br><br>')
+        .replace(/\n/g, '<br>');
 }
 
 function removePopup() {

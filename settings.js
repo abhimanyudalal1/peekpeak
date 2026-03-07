@@ -6,6 +6,7 @@ function saveOptions() {
     const systemPrompt = document.getElementById('systemPrompt').value;
     const modelSelection = document.getElementById('modelSelection').value;
     const responseLength = document.getElementById('responseLength').value;
+    const theme = document.getElementById('theme').value;
 
     chrome.storage.sync.set(
         {
@@ -13,6 +14,7 @@ function saveOptions() {
             systemPrompt,
             modelSelection,
             responseLength,
+            theme,
         },
         () => {
             // Update status to let user know options were saved.
@@ -33,12 +35,14 @@ function restoreOptions() {
             systemPrompt: 'Briefly explain the highlighted text in 2-3 sentences.',
             modelSelection: 'gemini-2.5-flash',
             responseLength: 'medium',
+            theme: 'light',
         },
         (items) => {
             document.getElementById('apiKey').value = items.apiKey;
             document.getElementById('systemPrompt').value = items.systemPrompt;
             document.getElementById('modelSelection').value = items.modelSelection;
             document.getElementById('responseLength').value = items.responseLength;
+            document.getElementById('theme').value = items.theme;
         }
     );
 }
