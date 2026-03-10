@@ -1,5 +1,7 @@
 let popupContainer = null;
 let conversationHistory = [];
+let currentNoteId = null;
+let currentNoteText = "";
 
 document.addEventListener('keydown', async (e) => {
     // Listen for Alt+A or Option+A
@@ -17,6 +19,15 @@ document.addEventListener('keydown', async (e) => {
             const container = range.commonAncestorContainer;
             const parentElement = container.nodeType === Node.TEXT_NODE ? container.parentElement : container;
 
+            // Check if already in an annotation
+            const parentAnnot = parentElement.closest('.ai-annotated');
+            if (parentAnnot) {
+                // Open existing annotation
+                const id = parentAnnot.dataset.aiId;
+                openAICard(id, parentAnnot);
+                return;
+            }
+
             let fullText = parentElement.innerText || parentElement.textContent || "";
             // If parent contains very little text, try grabbing from grandparent
             if (fullText.length < 300 && parentElement.parentElement) {
@@ -32,10 +43,31 @@ document.addEventListener('keydown', async (e) => {
                 contextText = fullText.substring(0, 500); // fallback
             }
 
+            // Wrap selection in .ai-annotated span
+            const span = document.createElement('span');
+            span.className = 'ai-annotated ai-annotated-active';
+            const noteId = 'ai-note-' + Date.now();
+            span.dataset.aiId = noteId;
+            span.title = "AI explanation available (click to open)";
+
+            try {
+                range.surroundContents(span);
+            } catch (err) {
+                span.appendChild(range.extractContents());
+                range.insertNode(span);
+            }
+            selection.removeAllRanges();
+
             const { theme } = await chrome.storage.sync.get({ theme: 'light' });
 
             conversationHistory = []; // Reset history for new popup
-            showPopup(rect, text, theme);
+            currentNoteId = noteId;
+            currentNoteText = text;
+
+            // Save empty stub to storage first
+            saveAnnotation(currentNoteId, currentNoteText, "", []);
+
+            showPopup(span.getBoundingClientRect(), text, theme, currentNoteId);
 
             // Send message to background script with context
             try {
@@ -48,13 +80,14 @@ document.addEventListener('keydown', async (e) => {
                         setInitialContent(response.result);
                         conversationHistory.push({ role: 'user', text: response.firstPrompt || text });
                         conversationHistory.push({ role: 'model', text: response.result });
+                        saveAnnotation(currentNoteId, currentNoteText, response.result, conversationHistory);
                     } else {
                         setInitialContent('Unknown error occurred.');
                     }
                 });
             } catch (err) {
                 if (err.message.includes('Extension context invalidated')) {
-                    setInitialContent('<strong>Error:</strong> The extension was just updated. Please <strong>refresh this webpage</strong> to continue using AI Quick Explain.');
+                    setInitialContent('<strong>Error:</strong> The extension was just updated. Please <strong>refresh this webpage</strong> to continue using peekPeak.');
                 } else {
                     setInitialContent('Error: ' + err.message);
                 }
@@ -63,8 +96,10 @@ document.addEventListener('keydown', async (e) => {
     }
 });
 
-function showPopup(rect, text, theme = 'light') {
-    removePopup(); // Remove existing popup if any
+function showPopup(rect, text, theme = 'light', noteId = null) {
+    if (popupContainer) {
+        removePopup();
+    }
 
     popupContainer = document.createElement('div');
     popupContainer.className = 'ai-quick-explain-popup' + (theme === 'dark' ? ' ai-quick-explain-dark' : '');
@@ -72,6 +107,8 @@ function showPopup(rect, text, theme = 'light') {
     // Calculate position: just below and slightly to the right of the selection
     let top = rect.bottom + window.scrollY + 10;
     let left = rect.left + window.scrollX;
+
+    let isAbove = false;
 
     // Basic bounds checking for width
     if (left + 300 > window.innerWidth + window.scrollX) {
@@ -84,36 +121,59 @@ function showPopup(rect, text, theme = 'light') {
     if (rect.bottom + 350 > window.innerHeight) {
         // Put it above the selection instead
         top = window.scrollY + rect.top - 360;
+        isAbove = true;
 
         // If there isn't enough space above either, stick it to the bottom of the viewport
         if (top < window.scrollY) {
             top = window.scrollY + window.innerHeight - 360;
+            isAbove = false;
         }
+    }
+
+    if (isAbove) {
+        popupContainer.classList.add('ai-qe-pos-above');
+    } else {
+        popupContainer.classList.add('ai-qe-pos-below');
     }
 
     popupContainer.style.top = `${top}px`;
     popupContainer.style.left = `${left}px`;
 
     popupContainer.innerHTML = `
-    <div class="ai-qe-header">
-      <span class="ai-qe-title">✨ AI Quick Explain</span>
-      <button class="ai-qe-close-header" id="ai-qe-close">✕</button>
-    </div>
-    <div class="ai-qe-content" id="ai-qe-content">
-      <div class="ai-qe-loading" id="ai-qe-active-loading">Thinking...</div>
-    </div>
-    <div class="ai-qe-footer">
-      <div class="ai-qe-chat-container">
-        <input type="text" class="ai-qe-chat-input" id="ai-qe-chat-input" placeholder="Ask a follow-up..." />
-        <button class="ai-qe-chat-submit" id="ai-qe-chat-submit">➔</button>
+    <div class="ai-qe-inner">
+      <div class="ai-qe-header">
+        <span class="ai-qe-title">peekPeak</span>
+        <div class="ai-qe-header-actions">
+           <button class="ai-qe-action-btn" id="ai-qe-minimize" title="Minimize">–</button>
+           <button class="ai-qe-action-btn" id="ai-qe-close" title="Delete">✕</button>
+        </div>
       </div>
-      <button class="ai-qe-btn" id="ai-qe-copy">Copy</button>
+      <div class="ai-qe-content" id="ai-qe-content">
+        <div class="ai-qe-loading" id="ai-qe-active-loading">Thinking...</div>
+      </div>
+      <div class="ai-qe-footer">
+        <div class="ai-qe-chat-container">
+          <input type="text" class="ai-qe-chat-input" id="ai-qe-chat-input" placeholder="Ask a follow-up..." />
+          <button class="ai-qe-chat-submit" id="ai-qe-chat-submit" aria-label="Send message">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+              <path d="M12 4V20M12 4L6 10M12 4L18 10" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/>
+            </svg>
+          </button>
+        </div>
+        <button class="ai-qe-btn" id="ai-qe-copy">Copy</button>
+      </div>
     </div>
   `;
 
     document.body.appendChild(popupContainer);
 
-    document.getElementById('ai-qe-close').addEventListener('click', removePopup);
+    // Give it a tiny delay to ensure animation plays if it was previously removed
+    requestAnimationFrame(() => {
+        popupContainer.classList.remove('ai-qe-hidden');
+    });
+
+    document.getElementById('ai-qe-minimize').addEventListener('click', () => minimizeCard(noteId));
+    document.getElementById('ai-qe-close').addEventListener('click', () => deleteAnnotation(noteId));
     document.getElementById('ai-qe-copy').addEventListener('click', () => {
         const content = document.getElementById('ai-qe-content').innerText;
         navigator.clipboard.writeText(content);
@@ -123,17 +183,31 @@ function showPopup(rect, text, theme = 'light') {
     });
 
     document.getElementById('ai-qe-chat-submit').addEventListener('click', handleFollowUp);
-    document.getElementById('ai-qe-chat-input').addEventListener('keypress', (e) => {
+
+    const chatInput = document.getElementById('ai-qe-chat-input');
+    chatInput.addEventListener('keypress', (e) => {
         if (e.key === 'Enter') handleFollowUp();
+    });
+    chatInput.addEventListener('input', (e) => {
+        const btn = document.getElementById('ai-qe-chat-submit');
+        if (e.target.value.trim().length > 0) {
+            btn.classList.add('ai-qe-show');
+        } else {
+            btn.classList.remove('ai-qe-show');
+        }
     });
 }
 
 function handleFollowUp() {
     const inputField = document.getElementById('ai-qe-chat-input');
+    const submitBtn = document.getElementById('ai-qe-chat-submit');
     const followUpText = inputField.value.trim();
     if (!followUpText) return;
 
     inputField.value = '';
+    if (submitBtn) {
+        submitBtn.classList.remove('ai-qe-show');
+    }
 
     appendUserMessage(followUpText);
 
@@ -157,6 +231,7 @@ function handleFollowUp() {
                 appendModelMessage(response.result);
                 conversationHistory.push({ role: 'user', text: followUpText });
                 conversationHistory.push({ role: 'model', text: response.result });
+                if (currentNoteId) saveAnnotation(currentNoteId, currentNoteText, response.result, conversationHistory);
             } else {
                 appendModelMessage('Unknown error occurred.');
             }
@@ -271,8 +346,162 @@ function removePopup() {
 }
 
 // Remove popup if user clicks outside of it
-document.addEventListener('mousedown', (e) => {
-    if (popupContainer && !popupContainer.contains(e.target)) {
-        removePopup();
+document.addEventListener('click', (e) => {
+    if (e.target.classList.contains("ai-annotated")) {
+        const id = e.target.dataset.aiId;
+        openAICard(id, e.target);
+    } else if (popupContainer && !popupContainer.contains(e.target)) {
+        if (!popupContainer.classList.contains('ai-qe-hidden') && currentNoteId) {
+            minimizeCard(currentNoteId);
+        }
     }
 });
+
+/* Helper Functions for Web Annotations */
+
+function minimizeCard(id) {
+    if (popupContainer) {
+        popupContainer.classList.add('ai-qe-hidden');
+    }
+    document.querySelectorAll('.ai-annotated').forEach(el => el.classList.remove('ai-annotated-active'));
+}
+
+function deleteAnnotation(id) {
+    removePopup();
+    const span = document.querySelector(`.ai-annotated[data-ai-id="${id}"]`);
+    if (span) {
+        const parent = span.parentNode;
+        while (span.firstChild) {
+            parent.insertBefore(span.firstChild, span);
+        }
+        parent.removeChild(span);
+        parent.normalize();
+    }
+    const url = window.location.href.split('#')[0];
+    chrome.storage.local.get({ annotations: {} }, (data) => {
+        const ann = data.annotations;
+        if (ann[url] && ann[url][id]) {
+            delete ann[url][id];
+            chrome.storage.local.set({ annotations: ann });
+        }
+    });
+}
+
+function saveAnnotation(id, text, resultHTML, history) {
+    if (!id) return;
+    const url = window.location.href.split('#')[0];
+    chrome.storage.local.get({ annotations: {} }, (data) => {
+        const ann = data.annotations;
+        if (!ann[url]) ann[url] = {};
+        ann[url][id] = {
+            id: id,
+            text: text,
+            response: resultHTML || '',
+            history: history || []
+        };
+        chrome.storage.local.set({ annotations: ann });
+    });
+}
+
+function openAICard(id, spanElement) {
+    const url = window.location.href.split('#')[0];
+    chrome.storage.local.get({ annotations: {}, theme: 'light' }, (data) => {
+        const ann = data.annotations[url];
+        if (ann && ann[id]) {
+            const note = ann[id];
+            currentNoteId = id;
+            currentNoteText = note.text;
+            conversationHistory = note.history || [];
+
+            document.querySelectorAll('.ai-annotated').forEach(el => el.classList.remove('ai-annotated-active'));
+            if (spanElement) spanElement.classList.add('ai-annotated-active');
+
+            const rect = spanElement ? spanElement.getBoundingClientRect() : { bottom: 0, left: 0, top: 0 };
+            showPopup(rect, note.text, data.theme, id);
+
+            if (conversationHistory.length > 0) {
+                const contentDiv = document.getElementById('ai-qe-content');
+                contentDiv.innerHTML = '';
+                conversationHistory.forEach((msg, idx) => {
+                    if (idx === 0 && msg.role === 'user') return; // Skip initial user context prompt
+                    if (msg.role === 'model') {
+                        appendModelMessage(msg.text);
+                    } else {
+                        appendUserMessage(msg.text);
+                    }
+                });
+            } else if (note.response) {
+                setInitialContent(note.response);
+            }
+        }
+    });
+}
+
+// Restore Annotations on load
+window.addEventListener('load', restoreAnnotations);
+
+// Watch for DOM changes (for SPAs like ChatGPT)
+let restoreTimeout;
+const observer = new MutationObserver(() => {
+    clearTimeout(restoreTimeout);
+    restoreTimeout = setTimeout(restoreAnnotations, 800);
+});
+// Start observing after a short delay to let initial load finish
+setTimeout(() => {
+    observer.observe(document.body, { childList: true, subtree: true });
+}, 1000);
+
+function restoreAnnotations() {
+    const url = window.location.href.split('#')[0];
+    chrome.storage.local.get({ annotations: {} }, (data) => {
+        const ann = data.annotations[url];
+        if (!ann) return;
+
+        let needsWrap = false;
+        for (const [id, note] of Object.entries(ann)) {
+            if (!document.querySelector(`.ai-annotated[data-ai-id="${id}"]`)) {
+                needsWrap = true;
+                break;
+            }
+        }
+
+        if (!needsWrap) return;
+
+        for (const [id, note] of Object.entries(ann)) {
+            if (!document.querySelector(`.ai-annotated[data-ai-id="${id}"]`)) {
+                wrapTextInDOM(document.body, note.text, id);
+            }
+        }
+    });
+}
+
+function wrapTextInDOM(node, text, id) {
+    if (!text || text.length < 3) return false;
+
+    const treeWalker = document.createTreeWalker(node, NodeFilter.SHOW_TEXT, null, false);
+    let n;
+    while (n = treeWalker.nextNode()) {
+        if (n.nodeValue.includes(text) && !n.parentElement.closest('.ai-annotated')) {
+            const idx = n.nodeValue.indexOf(text);
+            const range = document.createRange();
+            range.setStart(n, idx);
+            range.setEnd(n, idx + text.length);
+
+            const span = document.createElement('span');
+            span.className = 'ai-annotated';
+            span.dataset.aiId = id;
+            span.title = "AI explanation available (click to open)";
+
+            try {
+                // Safely extract and wrap the exact range
+                const extracted = range.extractContents();
+                span.appendChild(extracted);
+                range.insertNode(span);
+                return true;
+            } catch (e) {
+                // ignore boundary crossing errors for restore
+            }
+        }
+    }
+    return false;
+}
