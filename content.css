@@ -16,6 +16,7 @@
     /* Allow manual resizing */
     min-width: 250px;
     min-height: 150px;
+    max-height: 85vh;
     animation: aige-fade-in 0.2s ease-out;
     font-size: 14px;
 }
@@ -98,7 +99,7 @@
 
 .ai-qe-content {
     padding: 14px;
-    max-height: 250px;
+    flex: 1;
     overflow-y: auto;
     line-height: 1.5;
 }
@@ -205,6 +206,74 @@
 
 .ai-quick-explain-popup.ai-quick-explain-dark .ai-qe-content pre code {
     color: #f8f8f2;
+}
+
+/* Beautiful Themed Code UI */
+.ai-qe-code-container {
+    background-color: #1e1e1e;
+    border-radius: 8px;
+    margin: 12px 0;
+    overflow: hidden;
+    border: 1px solid #333;
+}
+
+.ai-qe-code-header {
+    background-color: #1e1e1e;
+    padding: 8px 14px;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    border-bottom: 1px solid #2d2d2d;
+    color: #ffffff;
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+    font-size: 13px;
+    font-weight: 500;
+}
+
+.ai-qe-code-icon {
+    font-family: monospace;
+    color: #888888;
+    font-size: 14px;
+}
+
+/* Override existing pre styles just for this container */
+.ai-qe-content .ai-qe-code-container pre {
+    background-color: #1e1e1e !important;
+    margin: 0 !important;
+    padding: 14px !important;
+    border: none !important;
+    border-radius: 0 !important;
+}
+
+.ai-qe-code-container code {
+    color: #f8f8f2 !important;
+    white-space: pre;
+}
+
+/* Dracula Syntax Highlight Tags */
+.ai-qe-kw {
+    color: #ff79c6;
+}
+
+.ai-qe-func {
+    color: #50fa7b;
+}
+
+.ai-qe-str {
+    color: #f1fa8c;
+}
+
+.ai-qe-num {
+    color: #ffb86c;
+}
+
+.ai-qe-bool {
+    color: #bd93f9;
+}
+
+.ai-qe-com {
+    color: #6272a4;
+    font-style: italic;
 }
 
 /* Chat Input Styles */

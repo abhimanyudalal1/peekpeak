@@ -205,15 +205,62 @@ function appendUserMessage(text) {
 }
 
 function formatMarkdown(markdownText) {
-    return markdownText
+    // 1. Escape HTML
+    let text = markdownText
         .replace(/</g, '&lt;')
-        .replace(/>/g, '&gt;')
-        .replace(/```(?:[\w]*\n)?([\s\S]*?)```/g, '<pre><code>$1</code></pre>')
+        .replace(/>/g, '&gt;');
+
+    // 2. Identify and format Code Blocks first, and replace them with a placeholder
+    const codeBlocks = [];
+    text = text.replace(/```([\w]*)\n([\s\S]*?)```/g, (match, lang, code) => {
+        const langDisplay = lang ? lang.charAt(0).toUpperCase() + lang.slice(1) : 'Code';
+
+        // Safe, single-pass syntax highlighting to prevent overlapping HTML tags
+        let highlightedCode = code.replace(
+            /((?:&quot;|").*?(?:&quot;|")|'.*?')|((?:\/\/|#).*?(?=\n|$))|\b(True|False|None|true|false|null|undefined)\b|\b(def|class|if|else|elif|for|while|in|return|import|from|const|let|var|function|async|await|try|catch)\b|\b(\d+)\b|\b([a-zA-Z_]\w*)(?=\()/g,
+            (match, str, com, bool, kw, num, func) => {
+                if (str) return `<span class="ai-qe-str">${str}</span>`;
+                if (com) return `<span class="ai-qe-com">${com}</span>`;
+                if (bool) return `<span class="ai-qe-bool">${bool}</span>`;
+                if (kw) return `<span class="ai-qe-kw">${kw}</span>`;
+                if (num) return `<span class="ai-qe-num">${num}</span>`;
+                if (func) return `<span class="ai-qe-func">${func}</span>`;
+                return match;
+            }
+        );
+
+        const block = `<div class="ai-qe-code-container">
+            <div class="ai-qe-code-header">
+                <span class="ai-qe-code-icon">&lt;/&gt;</span>
+                <span class="ai-qe-code-lang">${langDisplay}</span>
+            </div>
+            <pre><code>${highlightedCode}</code></pre>
+        </div>`;
+        codeBlocks.push(block);
+        return `__CODE_BLOCK_${codeBlocks.length - 1}__`;
+    });
+
+    // 3. Fallback for inline code blocks without lang formatting
+    text = text.replace(/```([\s\S]*?)```/g, (match, code) => {
+        const block = `<pre><code>${code}</code></pre>`;
+        codeBlocks.push(block);
+        return `__CODE_BLOCK_${codeBlocks.length - 1}__`;
+    });
+
+    // 4. Format the rest of markdown
+    text = text
         .replace(/`([^`]+)`/g, '<code>$1</code>')
         .replace(/\*\*([\s\S]*?)\*\*/g, '<strong>$1</strong>')
         .replace(/\*([^\*]+)\*/g, '<em>$1</em>')
         .replace(/\n{2,}/g, '<br><br>')
         .replace(/\n/g, '<br>');
+
+    // 5. Restore code blocks
+    for (let i = 0; i < codeBlocks.length; i++) {
+        text = text.replace(`__CODE_BLOCK_${i}__`, codeBlocks[i]);
+    }
+
+    return text;
 }
 
 function removePopup() {
