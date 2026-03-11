@@ -2,6 +2,8 @@ let popupContainer = null;
 let conversationHistory = [];
 let currentNoteId = null;
 let currentNoteText = "";
+let currentAnchorSpan = null;
+let _ppScrollHandler = null;
 
 document.addEventListener('keydown', async (e) => {
     // Listen for Alt+A or Option+A
@@ -106,40 +108,53 @@ function showPopup(rect, text, theme = 'light', noteId = null) {
     popupContainer = document.createElement('div');
     popupContainer.className = 'ai-quick-explain-popup' + (theme === 'dark' ? ' ai-quick-explain-dark' : '');
 
-    // Calculate position: just below and slightly to the right of the selection
-    let top = rect.bottom + window.scrollY + 10;
-    let left = rect.left + window.scrollX;
-
-    let isAbove = false;
-
-    // Basic bounds checking for width
-    if (left + 300 > window.innerWidth + window.scrollX) {
-        left = window.innerWidth + window.scrollX - 320;
-        if (left < window.scrollX) left = window.scrollX + 10; // Prevent going off left edge
+    // Find the anchor span for this note
+    if (noteId) {
+        currentAnchorSpan = document.querySelector(`.ai-annotated[data-ai-id="${noteId}"]`);
     }
 
-    // Basic bounds checking for height
-    // Prevent the popup from going below the visible viewport
-    if (rect.bottom + 350 > window.innerHeight) {
-        // Put it above the selection instead
-        top = window.scrollY + rect.top - 360;
-        isAbove = true;
+    function positionPopup() {
+        const anchorRect = currentAnchorSpan ? currentAnchorSpan.getBoundingClientRect() : rect;
 
-        // If there isn't enough space above either, stick it to the bottom of the viewport
-        if (top < window.scrollY) {
-            top = window.scrollY + window.innerHeight - 360;
-            isAbove = false;
+        let top = anchorRect.bottom + window.scrollY + 10;
+        let left = anchorRect.left + window.scrollX;
+
+        let isAbove = false;
+
+        // Bounds checking for width
+        if (left + 380 > window.innerWidth + window.scrollX) {
+            left = window.innerWidth + window.scrollX - 400;
+            if (left < window.scrollX) left = window.scrollX + 10;
         }
+
+        // Bounds checking for height
+        if (anchorRect.bottom + 350 > window.innerHeight) {
+            top = window.scrollY + anchorRect.top - 360;
+            isAbove = true;
+
+            if (top < window.scrollY) {
+                top = window.scrollY + window.innerHeight - 360;
+                isAbove = false;
+            }
+        }
+
+        popupContainer.classList.remove('ai-qe-pos-above', 'ai-qe-pos-below');
+        popupContainer.classList.add(isAbove ? 'ai-qe-pos-above' : 'ai-qe-pos-below');
+
+        popupContainer.style.top = `${top}px`;
+        popupContainer.style.left = `${left}px`;
     }
 
-    if (isAbove) {
-        popupContainer.classList.add('ai-qe-pos-above');
-    } else {
-        popupContainer.classList.add('ai-qe-pos-below');
-    }
+    positionPopup();
 
-    popupContainer.style.top = `${top}px`;
-    popupContainer.style.left = `${left}px`;
+    // Attach a scroll/resize listener so the popup follows the text
+    _ppScrollHandler = () => {
+        if (popupContainer && !popupContainer.classList.contains('ai-qe-hidden')) {
+            positionPopup();
+        }
+    };
+    window.addEventListener('scroll', _ppScrollHandler, true);
+    window.addEventListener('resize', _ppScrollHandler);
 
     popupContainer.innerHTML = `
     <div class="ai-qe-inner">
@@ -341,10 +356,16 @@ function formatMarkdown(markdownText) {
 }
 
 function removePopup() {
+    if (_ppScrollHandler) {
+        window.removeEventListener('scroll', _ppScrollHandler, true);
+        window.removeEventListener('resize', _ppScrollHandler);
+        _ppScrollHandler = null;
+    }
     if (popupContainer) {
         popupContainer.remove();
         popupContainer = null;
     }
+    currentAnchorSpan = null;
 }
 
 // Use mousedown with capture phase to prevent SPAs from swallowing the event
