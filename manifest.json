@@ -1,6 +1,6 @@
 {
     "manifest_version": 3,
-    "name": "AI Quick Explain",
+    "name": "peekPeak",
     "version": "1.0",
     "description": "Highlight text to get a quick AI explanation.",
     "permissions": [
@@ -13,7 +13,7 @@
     },
     "action": {
         "default_popup": "popup.html",
-        "default_title": "AI Quick Explain"
+        "default_title": "peekPeak"
     },
     "options_ui": {
         "page": "settings.html",

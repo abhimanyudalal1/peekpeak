@@ -41,7 +41,21 @@ async function handleExplainRequest(request) {
                 parts: [{ text: request.text }]
             });
         } else {
-            const finalPrompt = `SYSTEM:\n${systemPrompt}\n\nCONSTRAINT:\n${lengthInstruction}\n\nCONTEXT FROM PAGE:\n${request.context || 'No context available'}\n\nUSER:\nExplain the highlighted phrase in the context of the page.\n\nHighlighted text:\n${request.text}`;
+            const finalPrompt = `You are helping a user who is studying something.
+
+SYSTEM: ${systemPrompt}
+CONSTRAINT: ${lengthInstruction}
+
+STEP 1: Infer the topic being studied from the surrounding text.
+STEP 2: Determine what the highlighted phrase means in that topic.
+STEP 3: Explain the phrase briefly with a practical example.
+
+Surrounding context:
+${request.context || 'No context available'}
+
+Highlighted phrase:
+${request.text}`;
+
             returnedPrompt = finalPrompt;
             contents = [{
                 role: 'user',
