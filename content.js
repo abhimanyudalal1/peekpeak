@@ -44,6 +44,7 @@ document.addEventListener('keydown', async (e) => {
             }
 
             // Wrap selection in .ai-annotated span
+            _ppPauseMutations = true;
             const span = document.createElement('span');
             span.className = 'ai-annotated ai-annotated-active';
             const noteId = 'ai-note-' + Date.now();
@@ -57,6 +58,7 @@ document.addEventListener('keydown', async (e) => {
                 range.insertNode(span);
             }
             selection.removeAllRanges();
+            setTimeout(() => { _ppPauseMutations = false; }, 200);
 
             const { theme } = await chrome.storage.sync.get({ theme: 'light' });
 
@@ -345,19 +347,21 @@ function removePopup() {
     }
 }
 
-// Remove popup if user clicks outside of it
-document.addEventListener('click', (e) => {
-    if (e.target.classList.contains("ai-annotated")) {
-        const id = e.target.dataset.aiId;
-        openAICard(id, e.target);
+// Use mousedown with capture phase to prevent SPAs from swallowing the event
+document.addEventListener('mousedown', (e) => {
+    if (e.target.closest && e.target.closest(".ai-annotated")) {
+        e.stopPropagation();
+        const span = e.target.closest('.ai-annotated');
+        const id = span.dataset.aiId;
+        openAICard(id, span);
     } else if (popupContainer && !popupContainer.contains(e.target)) {
         if (!popupContainer.classList.contains('ai-qe-hidden') && currentNoteId) {
             minimizeCard(currentNoteId);
         }
     }
-});
+}, true);
 
-/* Helper Functions for Web Annotations */
+/* ===== Annotation Helper Functions ===== */
 
 function minimizeCard(id) {
     if (popupContainer) {
@@ -367,6 +371,7 @@ function minimizeCard(id) {
 }
 
 function deleteAnnotation(id) {
+    _ppPauseMutations = true;
     removePopup();
     const span = document.querySelector(`.ai-annotated[data-ai-id="${id}"]`);
     if (span) {
@@ -385,6 +390,7 @@ function deleteAnnotation(id) {
             chrome.storage.local.set({ annotations: ann });
         }
     });
+    setTimeout(() => { _ppPauseMutations = false; }, 100);
 }
 
 function saveAnnotation(id, text, resultHTML, history) {
@@ -405,25 +411,28 @@ function saveAnnotation(id, text, resultHTML, history) {
 
 function openAICard(id, spanElement) {
     const url = window.location.href.split('#')[0];
-    chrome.storage.local.get({ annotations: {}, theme: 'light' }, (data) => {
-        const ann = data.annotations[url];
-        if (ann && ann[id]) {
-            const note = ann[id];
-            currentNoteId = id;
-            currentNoteText = note.text;
-            conversationHistory = note.history || [];
+    // Theme is in sync storage, annotations are in local storage
+    chrome.storage.sync.get({ theme: 'light' }, (syncData) => {
+        const theme = syncData.theme;
+        chrome.storage.local.get({ annotations: {} }, (data) => {
+            const ann = data.annotations ? data.annotations[url] : null;
+            if (ann && ann[id]) {
+                const note = ann[id];
+                currentNoteId = id;
+                currentNoteText = note.text;
+                conversationHistory = note.history || [];
 
-            document.querySelectorAll('.ai-annotated').forEach(el => el.classList.remove('ai-annotated-active'));
-            if (spanElement) spanElement.classList.add('ai-annotated-active');
+                document.querySelectorAll('.ai-annotated').forEach(el => el.classList.remove('ai-annotated-active'));
+                if (spanElement) spanElement.classList.add('ai-annotated-active');
 
-            const rect = spanElement ? spanElement.getBoundingClientRect() : { bottom: 0, left: 0, top: 0 };
-            showPopup(rect, note.text, data.theme, id);
+                const rect = spanElement ? spanElement.getBoundingClientRect() : { bottom: 0, left: 0, top: 0 };
+                showPopup(rect, note.text, theme, id);
 
             if (conversationHistory.length > 0) {
                 const contentDiv = document.getElementById('ai-qe-content');
                 contentDiv.innerHTML = '';
                 conversationHistory.forEach((msg, idx) => {
-                    if (idx === 0 && msg.role === 'user') return; // Skip initial user context prompt
+                    if (idx === 0 && msg.role === 'user') return;
                     if (msg.role === 'model') {
                         appendModelMessage(msg.text);
                     } else {
@@ -433,56 +442,136 @@ function openAICard(id, spanElement) {
             } else if (note.response) {
                 setInitialContent(note.response);
             }
-        }
+            }
+        });
     });
 }
 
-// Restore Annotations on load
-window.addEventListener('load', restoreAnnotations);
+/* ===== Error-Proof Annotation Restoration System ===== */
 
-// Watch for DOM changes (for SPAs like ChatGPT)
-let restoreTimeout;
-const observer = new MutationObserver(() => {
-    clearTimeout(restoreTimeout);
-    restoreTimeout = setTimeout(restoreAnnotations, 800);
+// Guard flag: when true, the MutationObserver won't trigger restoreAnnotations
+let _ppPauseMutations = false;
+
+// Debounce timer
+let _ppRestoreTimer = null;
+
+// Track the last known URL for SPA navigation detection
+let _ppLastUrl = window.location.href.split('#')[0];
+
+// MutationObserver: only react when *our* spans might have been removed
+const _ppObserver = new MutationObserver((mutations) => {
+    if (_ppPauseMutations) return;
+
+    // Check if any removed nodes contained our annotations
+    let lostAnnotation = false;
+    for (const mutation of mutations) {
+        for (const removed of mutation.removedNodes) {
+            if (removed.nodeType === Node.ELEMENT_NODE) {
+                if (removed.classList && removed.classList.contains('ai-annotated')) {
+                    lostAnnotation = true;
+                    break;
+                }
+                if (removed.querySelector && removed.querySelector('.ai-annotated')) {
+                    lostAnnotation = true;
+                    break;
+                }
+            }
+        }
+        if (lostAnnotation) break;
+    }
+
+    // Also check for SPA URL changes
+    const currentUrl = window.location.href.split('#')[0];
+    if (currentUrl !== _ppLastUrl) {
+        _ppLastUrl = currentUrl;
+        lostAnnotation = true; // new page, try to restore
+    }
+
+    if (lostAnnotation) {
+        clearTimeout(_ppRestoreTimer);
+        _ppRestoreTimer = setTimeout(restoreAnnotations, 600);
+    }
 });
-// Start observing after a short delay to let initial load finish
-setTimeout(() => {
-    observer.observe(document.body, { childList: true, subtree: true });
-}, 1000);
+
+// Start observing
+_ppObserver.observe(document.documentElement, { childList: true, subtree: true });
+
+// Also restore on initial page load
+window.addEventListener('load', () => {
+    setTimeout(restoreAnnotations, 300);
+});
+
+// Additional: periodically check (every 3s) as a safety-net for aggressive SPAs
+setInterval(() => {
+    const url = window.location.href.split('#')[0];
+    chrome.storage.local.get({ annotations: {} }, (data) => {
+        const ann = data.annotations[url];
+        if (!ann) return;
+        for (const [id, note] of Object.entries(ann)) {
+            if (!document.querySelector(`.ai-annotated[data-ai-id="${id}"]`)) {
+                restoreAnnotations();
+                return;
+            }
+        }
+    });
+}, 3000);
 
 function restoreAnnotations() {
+    if (_ppPauseMutations) return;
+
     const url = window.location.href.split('#')[0];
     chrome.storage.local.get({ annotations: {} }, (data) => {
         const ann = data.annotations[url];
         if (!ann) return;
 
-        let needsWrap = false;
+        // Collect IDs that are missing from the DOM
+        const missingIds = [];
         for (const [id, note] of Object.entries(ann)) {
             if (!document.querySelector(`.ai-annotated[data-ai-id="${id}"]`)) {
-                needsWrap = true;
-                break;
+                missingIds.push(id);
             }
         }
 
-        if (!needsWrap) return;
+        if (missingIds.length === 0) return;
 
-        for (const [id, note] of Object.entries(ann)) {
-            if (!document.querySelector(`.ai-annotated[data-ai-id="${id}"]`)) {
-                wrapTextInDOM(document.body, note.text, id);
-            }
+        // Pause the observer while we inject our spans
+        _ppPauseMutations = true;
+
+        for (const id of missingIds) {
+            wrapTextInDOM(document.body, ann[id].text, id);
         }
+
+        // Resume the observer after a tick
+        setTimeout(() => { _ppPauseMutations = false; }, 200);
     });
 }
 
-function wrapTextInDOM(node, text, id) {
+function wrapTextInDOM(root, text, id) {
     if (!text || text.length < 3) return false;
 
-    const treeWalker = document.createTreeWalker(node, NodeFilter.SHOW_TEXT, null, false);
+    // Skip script, style, and our own popup elements
+    const SKIP_TAGS = new Set(['SCRIPT', 'STYLE', 'NOSCRIPT', 'TEXTAREA', 'INPUT', 'SELECT']);
+
+    const treeWalker = document.createTreeWalker(
+        root,
+        NodeFilter.SHOW_TEXT,
+        {
+            acceptNode(node) {
+                if (node.parentElement.closest('.ai-annotated')) return NodeFilter.FILTER_REJECT;
+                if (node.parentElement.closest('.ai-quick-explain-popup')) return NodeFilter.FILTER_REJECT;
+                if (SKIP_TAGS.has(node.parentElement.tagName)) return NodeFilter.FILTER_REJECT;
+                return NodeFilter.FILTER_ACCEPT;
+            }
+        },
+        false
+    );
+
     let n;
     while (n = treeWalker.nextNode()) {
-        if (n.nodeValue.includes(text) && !n.parentElement.closest('.ai-annotated')) {
-            const idx = n.nodeValue.indexOf(text);
+        const idx = n.nodeValue.indexOf(text);
+        if (idx === -1) continue;
+
+        try {
             const range = document.createRange();
             range.setStart(n, idx);
             range.setEnd(n, idx + text.length);
@@ -492,16 +581,14 @@ function wrapTextInDOM(node, text, id) {
             span.dataset.aiId = id;
             span.title = "AI explanation available (click to open)";
 
-            try {
-                // Safely extract and wrap the exact range
-                const extracted = range.extractContents();
-                span.appendChild(extracted);
-                range.insertNode(span);
-                return true;
-            } catch (e) {
-                // ignore boundary crossing errors for restore
-            }
+            const extracted = range.extractContents();
+            span.appendChild(extracted);
+            range.insertNode(span);
+            return true;
+        } catch (e) {
+            // Boundary error, skip this text node
         }
     }
     return false;
 }
+
