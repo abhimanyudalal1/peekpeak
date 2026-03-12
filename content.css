@@ -459,3 +459,87 @@
 .ai-annotated.ai-annotated-active {
     background-color: rgba(99, 102, 241, 0.25) !important;
 }
+
+/* Markdown Content Styles */
+.ai-qe-content p {
+    margin: 0 0 10px 0;
+}
+.ai-qe-content p:last-child {
+    margin-bottom: 0;
+}
+.ai-qe-content h1, .ai-qe-content h2, .ai-qe-content h3, .ai-qe-content h4, .ai-qe-content h5, .ai-qe-content h6 {
+    margin: 16px 0 8px 0;
+    font-weight: 600;
+    line-height: 1.25;
+}
+.ai-qe-content h1 { font-size: 1.4em; }
+.ai-qe-content h2 { font-size: 1.2em; border-bottom: 1px solid rgba(0,0,0,0.1); padding-bottom: 4px; }
+.ai-qe-content h3 { font-size: 1.1em; }
+.ai-qe-content ul, .ai-qe-content ol {
+    margin: 8px 0;
+    padding-left: 20px;
+}
+.ai-qe-content li {
+    margin-bottom: 4px;
+}
+.ai-qe-content blockquote {
+    margin: 12px 0;
+    padding: 8px 14px;
+    border-left: 3px solid #007bff;
+    background-color: rgba(0, 123, 255, 0.05);
+    border-radius: 0 4px 4px 0;
+    color: #555;
+    font-style: italic;
+}
+
+/* Markdown Table Styles */
+.ai-qe-content table {
+    width: 100%;
+    max-width: 100%;
+    margin: 12px 0;
+    border-collapse: collapse;
+    background-color: #fff;
+    border-radius: 6px;
+    overflow: hidden;
+    box-shadow: 0 1px 3px rgba(0,0,0,0.05);
+    border: 1px solid rgba(0,0,0,0.1);
+}
+.ai-qe-content th, .ai-qe-content td {
+    padding: 8px 12px;
+    border: 1px solid rgba(0,0,0,0.1);
+    text-align: left;
+}
+.ai-qe-content th {
+    background-color: #f8f9fa;
+    font-weight: 600;
+    color: #333;
+}
+.ai-qe-content tbody tr:nth-of-type(even) {
+    background-color: rgba(0,0,0,0.02);
+}
+
+/* Dark Mode Overrides for Markdown Elements */
+.ai-quick-explain-popup.ai-quick-explain-dark .ai-qe-content h2 {
+    border-bottom-color: rgba(255,255,255,0.1);
+}
+.ai-quick-explain-popup.ai-quick-explain-dark .ai-qe-content blockquote {
+    border-left-color: #4da3ff;
+    background-color: rgba(77, 163, 255, 0.1);
+    color: #bbb;
+}
+.ai-quick-explain-popup.ai-quick-explain-dark .ai-qe-content table {
+    background-color: transparent;
+    border-color: rgba(255,255,255,0.15);
+    box-shadow: 0 1px 3px rgba(0,0,0,0.2);
+}
+.ai-quick-explain-popup.ai-quick-explain-dark .ai-qe-content th,
+.ai-quick-explain-popup.ai-quick-explain-dark .ai-qe-content td {
+    border-color: rgba(255,255,255,0.15);
+}
+.ai-quick-explain-popup.ai-quick-explain-dark .ai-qe-content th {
+    background-color: rgba(255,255,255,0.05);
+    color: #e0e0e0;
+}
+.ai-quick-explain-popup.ai-quick-explain-dark .ai-qe-content tbody tr:nth-of-type(even) {
+    background-color: rgba(255,255,255,0.02);
+}

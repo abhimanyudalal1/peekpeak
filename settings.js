@@ -32,7 +32,17 @@ function restoreOptions() {
     chrome.storage.sync.get(
         {
             apiKey: '',
-            systemPrompt: 'Briefly explain the highlighted text in 2-3 sentences.',
+            systemPrompt: `Explain the highlighted concept briefly.
+
+Format the response in clean Markdown.
+
+Guidelines:
+- Use **bold** for key ideas
+- Use bullet points when useful
+- Put examples in code blocks
+- Keep it concise (4–6 lines max)
+
+Prefer practical explanations with an example over dictionary definitions.`,
             modelSelection: 'gemini-2.5-flash',
             responseLength: 'medium',
             theme: 'light',
