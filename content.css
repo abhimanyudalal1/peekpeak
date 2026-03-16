@@ -147,11 +147,21 @@
 }
 
 .ai-qe-title {
-    font-family: ui-serif, Georgia, Cambria, "Times New Roman", Times, serif;
-    font-weight: 600;
-    font-size: 16px;
-    color: #111;
-    letter-spacing: -0.3px;
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif !important;
+    font-weight: 700 !important;
+    font-size: 10px !important;
+    text-transform: uppercase !important;
+    letter-spacing: 1.5px !important;
+    color: #888 !important;
+    display: flex !important;
+    align-items: center !important;
+    gap: 5px !important;
+    user-select: none !important;
+}
+
+/* Dark mode adjustment for the title text so it stays subtle but readable */
+.ai-quick-explain-popup.ai-quick-explain-dark .ai-qe-title {
+    color: #999 !important;
 }
 
 .ai-qe-content {

@@ -159,7 +159,10 @@ function showPopup(rect, text, theme = 'light', noteId = null) {
     popupContainer.innerHTML = `
     <div class="ai-qe-inner">
       <div class="ai-qe-header">
-        <span class="ai-qe-title">peekPeak</span>
+        <span class="ai-qe-title">
+          <svg width="12" height="12" viewBox="0 0 24 24" fill="currentColor" xmlns="http://www.w3.org/2000/svg" style="color: #6366f1;"><path d="M12 2L14.5 9.5L22 12L14.5 14.5L12 22L9.5 14.5L2 12L9.5 9.5L12 2Z"/></svg>
+          PEEKPEAK
+        </span>
         <div class="ai-qe-header-actions">
            <button class="ai-qe-action-btn" id="ai-qe-minimize" title="Minimize">–</button>
            <button class="ai-qe-action-btn" id="ai-qe-close" title="Delete">✕</button>
