@@ -146,6 +146,9 @@ function showPopup(rect, text, theme = 'light', noteId = null, userSizeArg = nul
 
     document.body.appendChild(popupContainer);
 
+    let hasCalculatedLayout = false;
+    let lockedIsAbove = false;
+
     function positionPopup() {
         if (!popupContainer) return;
         const inner = popupContainer.querySelector('.ai-qe-inner');
@@ -153,51 +156,58 @@ function showPopup(rect, text, theme = 'light', noteId = null, userSizeArg = nul
 
         const anchorRect = currentAnchorSpan ? currentAnchorSpan.getBoundingClientRect() : rect;
 
-        const hasUserDims = userSize && userSize.width;
-        if (hasUserDims) {
-            inner.style.width = userSize.width;
-            if (userSize.height) inner.style.height = userSize.height;
-            inner.style.maxHeight = '85vh';
-        } else {
-            inner.style.width = '400px';
-            inner.style.height = 'auto'; // allow content to dictate height
-            inner.style.maxHeight = '85vh';
+        if (!hasCalculatedLayout) {
+            const hasUserDims = userSize && userSize.width;
+            if (hasUserDims) {
+                inner.style.width = userSize.width;
+                if (userSize.height) inner.style.height = userSize.height;
+                inner.style.maxHeight = '85vh';
+            } else {
+                inner.style.width = '400px';
+                inner.style.height = 'auto'; // allow content to dictate height
+                inner.style.maxHeight = '85vh';
+            }
+
+            let initialWidth = popupContainer.offsetWidth;
+            let initialHeight = popupContainer.offsetHeight;
+
+            const spaceBelow = window.innerHeight - anchorRect.bottom;
+            const spaceAbove = anchorRect.top;
+
+            const fitsBelow = initialHeight + 10 <= spaceBelow;
+            const fitsAbove = initialHeight + 10 <= spaceAbove;
+
+            if (!hasUserDims && !fitsBelow && !fitsAbove) {
+                const maxWidth = Math.min(600, window.innerWidth - 40);
+                if (maxWidth > 400) {
+                    inner.style.width = maxWidth + 'px';
+                    initialWidth = popupContainer.offsetWidth; // remeasure
+                    initialHeight = popupContainer.offsetHeight;
+                }
+            }
+
+            const fitsBelowNow = initialHeight + 10 <= spaceBelow;
+            const fitsAboveNow = initialHeight + 10 <= spaceAbove;
+
+            if (fitsBelowNow) {
+                lockedIsAbove = false;
+            } else if (fitsAboveNow) {
+                lockedIsAbove = true;
+            } else {
+                lockedIsAbove = spaceAbove > spaceBelow;
+                const maxAvailable = lockedIsAbove ? spaceAbove - 20 : spaceBelow - 20;
+                inner.style.maxHeight = Math.max(150, maxAvailable) + 'px';
+            }
+            
+            hasCalculatedLayout = true;
+            popupContainer.classList.remove('ai-qe-pos-above', 'ai-qe-pos-below');
+            popupContainer.classList.add(lockedIsAbove ? 'ai-qe-pos-above' : 'ai-qe-pos-below');
         }
 
         let pWidth = popupContainer.offsetWidth;
         let pHeight = popupContainer.offsetHeight;
-        let isAbove = false;
 
-        const spaceBelow = window.innerHeight - anchorRect.bottom;
-        const spaceAbove = anchorRect.top;
-
-        const fitsBelow = pHeight + 10 <= spaceBelow;
-        const fitsAbove = pHeight + 10 <= spaceAbove;
-
-        if (!hasUserDims && !fitsBelow && !fitsAbove) {
-            const maxWidth = Math.min(600, window.innerWidth - 40);
-            if (maxWidth > 400) {
-                inner.style.width = maxWidth + 'px';
-                pWidth = popupContainer.offsetWidth; // remeasure
-                pHeight = popupContainer.offsetHeight;
-            }
-        }
-
-        const fitsBelowNow = pHeight + 10 <= spaceBelow;
-        const fitsAboveNow = pHeight + 10 <= spaceAbove;
-
-        if (fitsBelowNow) {
-            isAbove = false;
-        } else if (fitsAboveNow) {
-            isAbove = true;
-        } else {
-            isAbove = spaceAbove > spaceBelow;
-            const maxAvailable = isAbove ? spaceAbove - 20 : spaceBelow - 20;
-            inner.style.maxHeight = Math.max(150, maxAvailable) + 'px';
-            pHeight = popupContainer.offsetHeight; // remeasure
-        }
-
-        let top = isAbove ? 
+        let top = lockedIsAbove ? 
             (anchorRect.top + window.scrollY - pHeight - 10) : 
             (anchorRect.bottom + window.scrollY + 10);
             
@@ -209,12 +219,6 @@ function showPopup(rect, text, theme = 'light', noteId = null, userSizeArg = nul
         if (left < window.scrollX + 10) {
             left = window.scrollX + 10;
         }
-        if (top < window.scrollY + 10) {
-            top = window.scrollY + 10;
-        }
-
-        popupContainer.classList.remove('ai-qe-pos-above', 'ai-qe-pos-below');
-        popupContainer.classList.add(isAbove ? 'ai-qe-pos-above' : 'ai-qe-pos-below');
 
         popupContainer.style.top = `${top}px`;
         popupContainer.style.left = `${left}px`;
