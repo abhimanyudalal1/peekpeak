@@ -100,61 +100,20 @@ document.addEventListener('keydown', async (e) => {
     }
 });
 
-function showPopup(rect, text, theme = 'light', noteId = null) {
+function showPopup(rect, text, theme = 'light', noteId = null, userSizeArg = null) {
     if (popupContainer) {
         removePopup();
     }
 
+    let userSize = userSizeArg;
+
     popupContainer = document.createElement('div');
-    popupContainer.className = 'ai-quick-explain-popup' + (theme === 'dark' ? ' ai-quick-explain-dark' : '');
+    popupContainer.className = 'ai-quick-explain-popup ai-qe-hidden' + (theme === 'dark' ? ' ai-quick-explain-dark' : '');
 
     // Find the anchor span for this note
     if (noteId) {
         currentAnchorSpan = document.querySelector(`.ai-annotated[data-ai-id="${noteId}"]`);
     }
-
-    function positionPopup() {
-        const anchorRect = currentAnchorSpan ? currentAnchorSpan.getBoundingClientRect() : rect;
-
-        let top = anchorRect.bottom + window.scrollY + 10;
-        let left = anchorRect.left + window.scrollX;
-
-        let isAbove = false;
-
-        // Bounds checking for width
-        if (left + 380 > window.innerWidth + window.scrollX) {
-            left = window.innerWidth + window.scrollX - 400;
-            if (left < window.scrollX) left = window.scrollX + 10;
-        }
-
-        // Bounds checking for height
-        if (anchorRect.bottom + 350 > window.innerHeight) {
-            top = window.scrollY + anchorRect.top - 360;
-            isAbove = true;
-
-            if (top < window.scrollY) {
-                top = window.scrollY + window.innerHeight - 360;
-                isAbove = false;
-            }
-        }
-
-        popupContainer.classList.remove('ai-qe-pos-above', 'ai-qe-pos-below');
-        popupContainer.classList.add(isAbove ? 'ai-qe-pos-above' : 'ai-qe-pos-below');
-
-        popupContainer.style.top = `${top}px`;
-        popupContainer.style.left = `${left}px`;
-    }
-
-    positionPopup();
-
-    // Attach a scroll/resize listener so the popup follows the text
-    _ppScrollHandler = () => {
-        if (popupContainer && !popupContainer.classList.contains('ai-qe-hidden')) {
-            positionPopup();
-        }
-    };
-    window.addEventListener('scroll', _ppScrollHandler, true);
-    window.addEventListener('resize', _ppScrollHandler);
 
     popupContainer.innerHTML = `
     <div class="ai-qe-inner">
@@ -186,6 +145,111 @@ function showPopup(rect, text, theme = 'light', noteId = null) {
   `;
 
     document.body.appendChild(popupContainer);
+
+    function positionPopup() {
+        if (!popupContainer) return;
+        const inner = popupContainer.querySelector('.ai-qe-inner');
+        if (!inner) return;
+
+        const anchorRect = currentAnchorSpan ? currentAnchorSpan.getBoundingClientRect() : rect;
+
+        const hasUserDims = userSize && userSize.width;
+        if (hasUserDims) {
+            inner.style.width = userSize.width;
+            if (userSize.height) inner.style.height = userSize.height;
+            inner.style.maxHeight = '85vh';
+        } else {
+            inner.style.width = '400px';
+            inner.style.height = 'auto'; // allow content to dictate height
+            inner.style.maxHeight = '85vh';
+        }
+
+        let pWidth = popupContainer.offsetWidth;
+        let pHeight = popupContainer.offsetHeight;
+        let isAbove = false;
+
+        const spaceBelow = window.innerHeight - anchorRect.bottom;
+        const spaceAbove = anchorRect.top;
+
+        const fitsBelow = pHeight + 10 <= spaceBelow;
+        const fitsAbove = pHeight + 10 <= spaceAbove;
+
+        if (!hasUserDims && !fitsBelow && !fitsAbove) {
+            const maxWidth = Math.min(600, window.innerWidth - 40);
+            if (maxWidth > 400) {
+                inner.style.width = maxWidth + 'px';
+                pWidth = popupContainer.offsetWidth; // remeasure
+                pHeight = popupContainer.offsetHeight;
+            }
+        }
+
+        const fitsBelowNow = pHeight + 10 <= spaceBelow;
+        const fitsAboveNow = pHeight + 10 <= spaceAbove;
+
+        if (fitsBelowNow) {
+            isAbove = false;
+        } else if (fitsAboveNow) {
+            isAbove = true;
+        } else {
+            isAbove = spaceAbove > spaceBelow;
+            const maxAvailable = isAbove ? spaceAbove - 20 : spaceBelow - 20;
+            inner.style.maxHeight = Math.max(150, maxAvailable) + 'px';
+            pHeight = popupContainer.offsetHeight; // remeasure
+        }
+
+        let top = isAbove ? 
+            (anchorRect.top + window.scrollY - pHeight - 10) : 
+            (anchorRect.bottom + window.scrollY + 10);
+            
+        let left = anchorRect.left + window.scrollX;
+
+        if (left + pWidth > window.innerWidth + window.scrollX - 10) {
+            left = window.innerWidth + window.scrollX - pWidth - 10;
+        }
+        if (left < window.scrollX + 10) {
+            left = window.scrollX + 10;
+        }
+        if (top < window.scrollY + 10) {
+            top = window.scrollY + 10;
+        }
+
+        popupContainer.classList.remove('ai-qe-pos-above', 'ai-qe-pos-below');
+        popupContainer.classList.add(isAbove ? 'ai-qe-pos-above' : 'ai-qe-pos-below');
+
+        popupContainer.style.top = `${top}px`;
+        popupContainer.style.left = `${left}px`;
+    }
+
+    positionPopup();
+
+    // Attach resize observer to track user resizing
+    const innerNode = popupContainer.querySelector('.ai-qe-inner');
+    if (innerNode) {
+        const obs = new MutationObserver((mutations) => {
+            if (!noteId) return;
+            for (const m of mutations) {
+                if (m.type === 'attributes' && m.attributeName === 'style') {
+                    const w = innerNode.style.width;
+                    const h = innerNode.style.height;
+                    // Detect if it was manually resized (pixel values, explicit height not 'auto')
+                    if (w && h && h !== 'auto') {
+                        userSize = { width: w, height: h };
+                        saveAnnotationSize(noteId, w, h);
+                    }
+                }
+            }
+        });
+        obs.observe(innerNode, { attributes: true, attributeFilter: ['style'] });
+    }
+
+    // Attach a scroll/resize listener so the popup follows the text
+    _ppScrollHandler = () => {
+        if (popupContainer && !popupContainer.classList.contains('ai-qe-hidden')) {
+            positionPopup();
+        }
+    };
+    window.addEventListener('scroll', _ppScrollHandler, true);
+    window.addEventListener('resize', _ppScrollHandler);
 
     // Give it a tiny delay to ensure animation plays if it was previously removed
     requestAnimationFrame(() => {
@@ -450,13 +514,29 @@ function saveAnnotation(id, text, resultHTML, history) {
     chrome.storage.local.get({ annotations: {} }, (data) => {
         const ann = data.annotations;
         if (!ann[url]) ann[url] = {};
+        const existing = ann[url][id] || {};
         ann[url][id] = {
-            id: id,
-            text: text,
-            response: resultHTML || '',
-            history: history || []
+            id: existing.id || id,
+            text: existing.text || text,
+            response: resultHTML !== undefined ? resultHTML : existing.response,
+            history: history !== undefined ? history : existing.history,
+            userWidth: existing.userWidth,
+            userHeight: existing.userHeight
         };
         chrome.storage.local.set({ annotations: ann });
+    });
+}
+
+function saveAnnotationSize(id, width, height) {
+    if (!id) return;
+    const url = window.location.href.split('#')[0];
+    chrome.storage.local.get({ annotations: {} }, (data) => {
+        const ann = data.annotations;
+        if (ann[url] && ann[url][id]) {
+            ann[url][id].userWidth = width;
+            ann[url][id].userHeight = height;
+            chrome.storage.local.set({ annotations: ann });
+        }
     });
 }
 
@@ -477,7 +557,8 @@ function openAICard(id, spanElement) {
                 if (spanElement) spanElement.classList.add('ai-annotated-active');
 
                 const rect = spanElement ? spanElement.getBoundingClientRect() : { bottom: 0, left: 0, top: 0 };
-                showPopup(rect, note.text, theme, id);
+                const userSize = note.userWidth ? { width: note.userWidth, height: note.userHeight } : null;
+                showPopup(rect, note.text, theme, id, userSize);
 
             if (conversationHistory.length > 0) {
                 const contentDiv = document.getElementById('ai-qe-content');

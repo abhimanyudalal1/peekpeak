@@ -73,36 +73,36 @@
 }
 
 .ai-quick-explain-popup.ai-quick-explain-dark .ai-qe-header {
-    background-color: transparent;
-    border-bottom-color: rgba(255, 255, 255, 0.08);
+    background-color: transparent !important;
+    border-bottom-color: rgba(255, 255, 255, 0.08) !important;
 }
 
 .ai-quick-explain-popup.ai-quick-explain-dark .ai-qe-title {
-    color: #f5f5f5;
+    color: #f5f5f5 !important;
 }
 
 .ai-quick-explain-popup.ai-quick-explain-dark .ai-qe-loading {
-    color: #aaaaaa;
+    color: #aaaaaa !important;
 }
 
 .ai-quick-explain-popup.ai-quick-explain-dark .ai-qe-loading::after {
-    border: 2px solid #444;
-    border-top-color: #4da3ff;
+    border: 2px solid #444 !important;
+    border-top-color: #4da3ff !important;
 }
 
 .ai-quick-explain-popup.ai-quick-explain-dark .ai-qe-footer {
-    background-color: transparent;
-    border-top-color: rgba(255, 255, 255, 0.08);
+    background-color: transparent !important;
+    border-top-color: rgba(255, 255, 255, 0.08) !important;
 }
 
 .ai-quick-explain-popup.ai-quick-explain-dark .ai-qe-btn {
-    background-color: rgba(255, 255, 255, 0.1);
-    border: none;
-    color: #e0e0e0;
+    background-color: rgba(255, 255, 255, 0.1) !important;
+    border: none !important;
+    color: #e0e0e0 !important;
 }
 
 .ai-quick-explain-popup.ai-quick-explain-dark .ai-qe-btn:hover {
-    background-color: rgba(255, 255, 255, 0.15);
+    background-color: rgba(255, 255, 255, 0.15) !important;
 }
 
 .ai-quick-explain-popup * {
@@ -162,6 +162,10 @@
 /* Dark mode adjustment for the title text so it stays subtle but readable */
 .ai-quick-explain-popup.ai-quick-explain-dark .ai-qe-title {
     color: #999 !important;
+}
+
+.ai-quick-explain-popup.ai-quick-explain-dark .ai-qe-content {
+    color: #e0e0e0 !important;
 }
 
 .ai-qe-content {
@@ -266,16 +270,16 @@
 /* Dark Mode Code Styles */
 .ai-quick-explain-popup.ai-quick-explain-dark .ai-qe-content pre,
 .ai-quick-explain-popup.ai-quick-explain-dark .ai-qe-content code {
-    background-color: #2d2d2d;
-    border-color: #404040;
+    background-color: #2d2d2d !important;
+    border-color: #404040 !important;
 }
 
 .ai-quick-explain-popup.ai-quick-explain-dark .ai-qe-content code {
-    color: #ff79c6;
+    color: #ff79c6 !important;
 }
 
 .ai-quick-explain-popup.ai-quick-explain-dark .ai-qe-content pre code {
-    color: #f8f8f2;
+    color: #f8f8f2 !important;
 }
 
 /* Beautiful Themed Code UI */
@@ -416,40 +420,41 @@
 
 /* Dark Mode Chat Styles */
 .ai-quick-explain-popup.ai-quick-explain-dark .ai-qe-action-btn {
-    color: #999;
+    color: #999 !important;
 }
 
 .ai-quick-explain-popup.ai-quick-explain-dark .ai-qe-action-btn:hover {
-    background-color: rgba(255, 255, 255, 0.1);
-    color: #fff;
+    background-color: rgba(255, 255, 255, 0.1) !important;
+    color: #fff !important;
 }
 
 .ai-quick-explain-popup.ai-quick-explain-dark .ai-qe-chat-container {
-    background-color: transparent;
-    border-top: none;
+    background-color: transparent !important;
+    border-top: none !important;
 }
 
 .ai-quick-explain-popup.ai-quick-explain-dark .ai-qe-chat-input {
-    background-color: rgba(0, 0, 0, 0.2);
-    border-color: rgba(255, 255, 255, 0.15);
-    color: #e0e0e0;
+    background-color: rgba(0, 0, 0, 0.2) !important;
+    border-color: rgba(255, 255, 255, 0.15) !important;
+    color: #e0e0e0 !important;
 }
 
 .ai-quick-explain-popup.ai-quick-explain-dark .ai-qe-chat-input:focus {
-    border-color: rgba(255, 255, 255, 0.3);
+    border-color: rgba(255, 255, 255, 0.3) !important;
 }
 
 .ai-quick-explain-popup.ai-quick-explain-dark .ai-qe-chat-submit {
-    background-color: #f5f5f5;
-    color: #111;
+    background-color: #f5f5f5 !important;
+    color: #111 !important;
 }
 
 .ai-quick-explain-popup.ai-quick-explain-dark .ai-qe-chat-submit:hover {
-    background-color: #d0d0d0;
+    background-color: #d0d0d0 !important;
 }
 
 .ai-quick-explain-popup.ai-quick-explain-dark .ai-qe-msg-user {
-    background-color: #333333;
+    background-color: #333333 !important;
+    color: #e0e0e0 !important;
 }
 
 /* Persistent Web Annotations */
@@ -529,27 +534,36 @@
 }
 
 /* Dark Mode Overrides for Markdown Elements */
+.ai-quick-explain-popup.ai-quick-explain-dark .ai-qe-content h1,
+.ai-quick-explain-popup.ai-quick-explain-dark .ai-qe-content h2,
+.ai-quick-explain-popup.ai-quick-explain-dark .ai-qe-content h3,
+.ai-quick-explain-popup.ai-quick-explain-dark .ai-qe-content h4,
+.ai-quick-explain-popup.ai-quick-explain-dark .ai-qe-content h5,
+.ai-quick-explain-popup.ai-quick-explain-dark .ai-qe-content h6 {
+    color: #e0e0e0 !important;
+}
 .ai-quick-explain-popup.ai-quick-explain-dark .ai-qe-content h2 {
-    border-bottom-color: rgba(255,255,255,0.1);
+    border-bottom-color: rgba(255,255,255,0.1) !important;
 }
 .ai-quick-explain-popup.ai-quick-explain-dark .ai-qe-content blockquote {
-    border-left-color: #4da3ff;
-    background-color: rgba(77, 163, 255, 0.1);
-    color: #bbb;
+    border-left-color: #4da3ff !important;
+    background-color: rgba(77, 163, 255, 0.1) !important;
+    color: #bbb !important;
 }
 .ai-quick-explain-popup.ai-quick-explain-dark .ai-qe-content table {
-    background-color: transparent;
-    border-color: rgba(255,255,255,0.15);
-    box-shadow: 0 1px 3px rgba(0,0,0,0.2);
+    background-color: transparent !important;
+    border-color: rgba(255,255,255,0.15) !important;
+    box-shadow: 0 1px 3px rgba(0,0,0,0.2) !important;
 }
 .ai-quick-explain-popup.ai-quick-explain-dark .ai-qe-content th,
 .ai-quick-explain-popup.ai-quick-explain-dark .ai-qe-content td {
-    border-color: rgba(255,255,255,0.15);
+    border-color: rgba(255,255,255,0.15) !important;
+    color: #e0e0e0 !important;
 }
 .ai-quick-explain-popup.ai-quick-explain-dark .ai-qe-content th {
-    background-color: rgba(255,255,255,0.05);
-    color: #e0e0e0;
+    background-color: rgba(255,255,255,0.05) !important;
+    color: #e0e0e0 !important;
 }
 .ai-quick-explain-popup.ai-quick-explain-dark .ai-qe-content tbody tr:nth-of-type(even) {
-    background-color: rgba(255,255,255,0.02);
+    background-color: rgba(255,255,255,0.02) !important;
 }
