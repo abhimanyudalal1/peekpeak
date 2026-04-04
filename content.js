@@ -305,7 +305,7 @@ function handleFollowUp() {
     loadingDiv.innerText = 'Thinking...';
     loadingDiv.id = 'ai-qe-active-loading';
     contentDiv.appendChild(loadingDiv);
-    contentDiv.scrollTop = contentDiv.scrollHeight;
+    contentDiv.scrollTo({ top: contentDiv.scrollHeight, behavior: 'smooth' });
 
     try {
         chrome.runtime.sendMessage({ action: 'explainText', text: followUpText, history: conversationHistory }, (response) => {
@@ -351,7 +351,9 @@ function appendModelMessage(markdownText) {
         div.style.marginTop = '12px';
         div.innerHTML = formatMarkdown(markdownText);
         contentDiv.appendChild(div);
-        contentDiv.scrollTop = contentDiv.scrollHeight;
+        setTimeout(() => {
+            contentDiv.scrollTo({ top: contentDiv.scrollHeight, behavior: 'smooth' });
+        }, 10);
     }
 }
 
@@ -363,7 +365,7 @@ function appendUserMessage(text) {
         div.className = 'ai-qe-msg-user';
         div.innerText = text;
         contentDiv.appendChild(div);
-        contentDiv.scrollTop = contentDiv.scrollHeight;
+        contentDiv.scrollTo({ top: contentDiv.scrollHeight, behavior: 'smooth' });
     }
 }
 
@@ -375,6 +377,16 @@ function formatMarkdown(markdownText) {
                     code(token) {
                         const rawCode = typeof token === 'string' ? token : token.text;
                         const lang = typeof token === 'string' ? arguments[1] : token.lang;
+                        
+                        // LLMs almost exclusively use fenced code blocks for real code.
+                        // If it lacks a language and isn't enclosed in backticks/tildes,
+                        // it is almost certainly a 4-space indentation hallucination (e.g. for a bulleted list).
+                        const isFenced = typeof token === 'object' && token.raw && /^\s*(?:```|~~~)/.test(token.raw);
+                        if (typeof token === 'object' && !lang && !isFenced) {
+                            // Re-parse the text as normal markdown to convert lists/paragraphs properly
+                            return marked.parse(rawCode);
+                        }
+
                         const langDisplay = lang ? lang.charAt(0).toUpperCase() + lang.slice(1) : 'Code';
 
                         // Escape HTML first

@@ -171,9 +171,29 @@
 .ai-qe-content {
     padding: 14px 16px !important;
     flex: 1 !important;
+    min-height: 0 !important;
     overflow-y: auto !important;
     line-height: 1.5 !important;
     background-color: transparent !important;
+}
+
+/* Custom Scrollbar for better UI inside popup */
+.ai-qe-content::-webkit-scrollbar {
+    width: 6px !important;
+    height: 6px !important;
+}
+
+.ai-qe-content::-webkit-scrollbar-track {
+    background: transparent !important;
+}
+
+.ai-qe-content::-webkit-scrollbar-thumb {
+    background: rgba(0, 0, 0, 0.2) !important;
+    border-radius: 4px !important;
+}
+
+.ai-qe-content::-webkit-scrollbar-thumb:hover {
+    background: rgba(0, 0, 0, 0.3) !important;
 }
 
 .ai-qe-loading {
@@ -280,6 +300,15 @@
 
 .ai-quick-explain-popup.ai-quick-explain-dark .ai-qe-content pre code {
     color: #f8f8f2 !important;
+}
+
+/* Dark mode scrollbar */
+.ai-quick-explain-popup.ai-quick-explain-dark .ai-qe-content::-webkit-scrollbar-thumb {
+    background: rgba(255, 255, 255, 0.2) !important;
+}
+
+.ai-quick-explain-popup.ai-quick-explain-dark .ai-qe-content::-webkit-scrollbar-thumb:hover {
+    background: rgba(255, 255, 255, 0.3) !important;
 }
 
 /* Beautiful Themed Code UI */
